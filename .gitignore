@@ -1,0 +1,28 @@
+# Virtualenvs
+hand_gesture_env/
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Jupyter
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
+
+# Editor directories
+.vscode/
+
+# Logs and runtime
+*.log
+*.pid
+*.seed
+
+# Optional: lockfiles
+pip-log.txt
+
