@@ -1,0 +1,4 @@
+opencv-python
+mediapipe
+numpy
+# Use: source hand_gesture_env/bin/activate && pip install -r requirements.txt
