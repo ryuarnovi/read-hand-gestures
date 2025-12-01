@@ -167,7 +167,7 @@ def main():
     # Inisialisasi kamera dan detector
     cap = cv2.VideoCapture(0)
     detector = HandGestureDetector()
-    
+
     print("=== Hand Gesture Recognition ===")
     print("Gestur yang dapat dideteksi:")
     print("✌️  Peace: Angkat 2 jari (telunjuk + tengah)")
@@ -177,60 +177,115 @@ def main():
     print("👌 OK: Bentuk lingkaran dengan ibu jari dan telunjuk")
     print("\nTekan 'q' untuk keluar")
     print("="*40)
-    
+
+    # Mapping gesture ke file gambar
+    gesture_images = {
+        "Mengepal ✊": "asset/Hamster Mengepal.jpeg",
+        "Peace ✌️": "asset/Hamster Peace.jpeg",
+        "Thumbs Up 👍": "asset/Hamster Thumb Up.jpeg",
+        "Hi Five 🖐️": "asset/Hamster Hi Five.jpeg",
+        "OK 👌": "asset/Hamster OK.jpeg"
+    }
+    last_shown_gesture = {"Left": None, "Right": None}
+
     while True:
         success, image = cap.read()
         if not success:
             print("Gagal membaca dari kamera")
             break
-        
+
         # Flip gambar untuk efek mirror
         image = cv2.flip(image, 1)
         h, w, c = image.shape
-        
+
         # Konversi BGR ke RGB
         rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         results = detector.hands.process(rgb_image)
-        
-        gesture = "Tidak ada tangan"
+
+        gesture_list = []
         hand_count = 0
-        
+
+        # Untuk menyimpan handedness jika ada
+        handedness_list = []
+
         if results.multi_hand_landmarks:
             hand_count = len(results.multi_hand_landmarks)
-            
-            for hand_landmarks in results.multi_hand_landmarks:
-                # Deteksi gestur
-                gesture = detector.detect_gesture(hand_landmarks.landmark)
-                
-                # Gambar landmark custom
-                detector.draw_landmarks(image, hand_landmarks.landmark)
-                
-                # Gambar bounding box
-                x_coords = [landmark.x for landmark in hand_landmarks.landmark]
-                y_coords = [landmark.y for landmark in hand_landmarks.landmark]
-                
-                x_min, x_max = int(min(x_coords) * w), int(max(x_coords) * w)
-                y_min, y_max = int(min(y_coords) * h), int(max(y_coords) * h)
-                
-                # Expand bounding box
-                margin = 20
-                x_min = max(0, x_min - margin)
-                y_min = max(0, y_min - margin)
-                x_max = min(w, x_max + margin)
-                y_max = min(h, y_max + margin)
-                
-                cv2.rectangle(image, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2)
-        
-        # Tambahkan panel informasi
-        detector.add_info_panel(image, gesture, hand_count)
-        
-        # Tampilkan hasil
+            # Ambil info handedness jika ada
+            if hasattr(results, 'multi_handedness') and results.multi_handedness:
+                for idx, (hand_landmarks, handedness) in enumerate(zip(results.multi_hand_landmarks, results.multi_handedness)):
+                    label = handedness.classification[0].label  # 'Left' atau 'Right'
+                    gesture = detector.detect_gesture(hand_landmarks.landmark)
+                    gesture_list.append((label, gesture))
+                    handedness_list.append(label)
+
+                    # Gambar landmark custom
+                    detector.draw_landmarks(image, hand_landmarks.landmark)
+
+                    # Gambar bounding box
+                    x_coords = [landmark.x for landmark in hand_landmarks.landmark]
+                    y_coords = [landmark.y for landmark in hand_landmarks.landmark]
+
+                    x_min, x_max = int(min(x_coords) * w), int(max(x_coords) * w)
+                    y_min, y_max = int(min(y_coords) * h), int(max(y_coords) * h)
+
+                    # Expand bounding box
+                    margin = 20
+                    x_min = max(0, x_min - margin)
+                    y_min = max(0, y_min - margin)
+                    x_max = min(w, x_max + margin)
+                    y_max = min(h, y_max + margin)
+
+                    cv2.rectangle(image, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2)
+            else:
+                # Fallback jika tidak ada info handedness
+                for hand_landmarks in results.multi_hand_landmarks:
+                    gesture = detector.detect_gesture(hand_landmarks.landmark)
+                    gesture_list.append(("Unknown", gesture))
+                    detector.draw_landmarks(image, hand_landmarks.landmark)
+
+        # Tambahkan panel informasi untuk setiap tangan
+        y_panel = 10
+        for idx, (label, gesture) in enumerate(gesture_list):
+            # Panel info per tangan
+            panel_text = f"Tangan: {label} | Gestur: {gesture}"
+            cv2.rectangle(image, (10, y_panel), (420, y_panel+40), (0, 0, 0), -1)
+            cv2.rectangle(image, (10, y_panel), (420, y_panel+40), (255, 255, 255), 2)
+            cv2.putText(image, panel_text, (20, y_panel+28), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+            y_panel += 50
+
+        # Tambahkan panel jumlah tangan dan instruksi
+        cv2.rectangle(image, (10, y_panel), (420, y_panel+40), (0, 0, 0), -1)
+        cv2.rectangle(image, (10, y_panel), (420, y_panel+40), (255, 255, 255), 2)
+        cv2.putText(image, f"Jumlah Tangan: {hand_count}", (20, y_panel+28), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        y_panel += 50
+        cv2.putText(image, "Tekan 'q' untuk keluar", (20, h - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+
+        # Tampilkan hasil utama
         cv2.imshow('Hand Gesture Recognition', image)
-        
+
+        # Tampilkan gambar gesture untuk masing-masing tangan (kiri/kanan)
+        for label in ["Left", "Right"]:
+            gesture = None
+            for l, g in gesture_list:
+                if l == label:
+                    gesture = g
+                    break
+            win_name = f'Gesture Image {label}'
+            if gesture in gesture_images:
+                if last_shown_gesture[label] != gesture:
+                    gesture_img = cv2.imread(gesture_images[gesture])
+                    if gesture_img is not None:
+                        cv2.imshow(win_name, gesture_img)
+                    last_shown_gesture[label] = gesture
+            else:
+                if last_shown_gesture[label] is not None:
+                    cv2.destroyWindow(win_name)
+                    last_shown_gesture[label] = None
+
         # Keluar jika tombol 'q' ditekan
         if cv2.waitKey(5) & 0xFF == ord('q'):
             break
-    
+
     cap.release()
     cv2.destroyAllWindows()
 
